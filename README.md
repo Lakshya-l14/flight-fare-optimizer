@@ -12,4 +12,4 @@ An interactive web application designed to compute and visualize optimal flight 
 * *Deployment:* GitHub Pages
 
 ## Live Demo
-[Click here to view live project](https://Lakshya-114.github.io/flight-fare-optimizer/)
+[Click here to view live project](https://lakshya-114.github.io/flight-fare-optimizer/)
