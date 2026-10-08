@@ -1,4 +1,4 @@
-# Flight Connectivity & Fare Optimizer
+# Flight Fare Optimizer
 An interactive web application designed to compute and visualize optimal flight routes and minimal travel fares between connected airports using graph algorithms.
 
 ##  Features
@@ -12,4 +12,4 @@ An interactive web application designed to compute and visualize optimal flight 
 * *Deployment:* GitHub Pages
 
 ## Live Demo
-[Click here to view live project](https://Lakshya-114.github.io/flight-connectivity-fare-optimizer/)
+[Click here to view live project](https://lakshya-114.github.io/flight-fare-optimizer/)
