@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title> Floyd-Warshall Route Optimizer</title>
+    <!-- Visual styles and modern look -->
+    <style>
+        :root {
+            --primary: #1d996e;
+            --background: #0e4168;
+            --card: #328ba4;
+            --text: #0f172a;
+        }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background-color: var(--background);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
+        .card {
+            background: var(--card);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05);
+        }
+        h2 { margin-top: 0; border-bottom: 2px solid #0d2a4f; padding-bottom: 8px; font-size: 1.25rem;}
+        #network-map {
+            height: 350px;
+            background: #f7f4f4;
+            border: 1px solid #050b14;
+            border-radius: 8px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            border: 1px solid #d9dfe7;
+            padding: 10px;
+            text-align: center;
+        }
+        th { background-color: #7796ba; }
+        .btn {
+            background-color: var(--primary);
+            color: rgb(173, 47, 47);
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            width: 100%;
+            margin-top: 15px;
+        }
+        .btn:hover { background-color: #325dd4; }
+        .stats-box {
+            background: #e6e8ec;
+            border-left: 4px solid var(--primary);
+            padding: 12px;
+            margin-top: 15px;
+            border-radius: 0 8px 8px 0;
+            font-weight: 500;
+        }
+        input[type="number"] {
+            width: 60px;
+            padding: 4px;
+            text-align: center;
+        }
+    </style>
+    <!-- vis.js Network library used for real-time interactive graph drawing -->
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/10.0.2/standalone/umd/vis-network.min.js"></script>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>Flight Connectivity & Fare Optimizer</h1>
+        <p>Implementing the Floyd-Warshall Algorithm </p>
+    </header>
+
+    <div class="grid">
+        <!-- Left Side: Inputs & Configurations -->
+        <div class="card">
+            <h2>1. Edit Direct Fares (Adjacency Matrix)</h2>
+            <p><small>*Use 999 to represent no direct flight pathway (Infinity).</small></p>
+            <div style="overflow-x: auto;">
+                <table id="input-table">
+                    <!-- Dynamic matrix will be loaded here by JavaScript -->
+                </table>
+            </div>
+            <button class="btn" onclick="runFloydWarshall()">Optimize Network Paths</button>
+            
+            <div id="complexity-output" class="stats-box" style="display: none;"></div>
+        </div>
+
+        <!-- Right Side: Live Network Graph -->
+        <div class="card">
+            <h2>2. Interactive Route Topography Map</h2>
+            <div id="network-map"></div>
+        </div>
+    </div>
+
+    <!-- Output Section Full Width -->
+    <div class="card" style="margin-top:20px;">
+        <h2>3. Optimized All-Pairs Minimum Fare Matrix Results</h2>
+        <div style="overflow-x: auto;">
+            <table id="output-table">
+                <tr><td>Click the button above to run the analysis engine.</td></tr>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+// Project configuration data structures
+const cities = ["Delhi", "Mumbai", "Bengaluru", "Kolkata"];
+const V = cities.length;
+const INF = 999;
+
+// Baseline direct costs matrix
+let graph = [
+    [0, 3, INF, 5],
+    [2, 0, INF, INF],
+    [INF, 1, 0, INF],
+    [INF, INF, 2, 0]
+];
+
+// 1. Build and render the editable table inputs automatically
+function initInputTable() {
+    const table = document.getElementById("input-table");
+    let html = `<tr><th>From \\ To</th>`;
+    cities.forEach(c => html += `<th>${c}</th>`);
+    html += `</tr>`;
+
+    for(let i=0; i<V; i++) {
+        html += `<tr><th><strong>${cities[i]}</strong></th>`;
+        for(let j=0; j<V; j++) {
+            let val = graph[i][j];
+            let disabled = i === j ? 'disabled' : '';
+            html += `<td><input type="number" id="cell-${i}-${j}" value="${val}" ${disabled} min="0"></td>`;
+        }
+        html += `</tr>`;
+    }
+    table.innerHTML = html;
+}
+
+// 2. Render visual nodes and active routing lines on the canvas screen
+function drawGraph() {
+    const container = document.getElementById('network-map');
+    const nodes = [];
+    const edges = [];
+
+    cities.forEach((city, index) => {
+        nodes.push({ id: index, label: city, color: '#93c5fd', font: { face: 'system-ui', size: 14, bold: true } });
+    });
+
+    for(let i=0; i<V; i++) {
+        for(let j=0; j<V; j++) {
+            if(i !== j && graph[i][j] !== INF) {
+                edges.push({
+                    from: i,
+                    to: j,
+                    label: '₹' + graph[i][j],
+                    arrows: 'to',
+                    color: { color: '#64748b', hover: '#2563eb' },
+                    font: { align: 'top', size: 12 }
+                });
+            }
+        }
+    }
+
+    const data = { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) };
+    const options = { physics: { stabilization: true }, interaction: { hover: true } };
+    new vis.Network(container, data, options);
+}
+
+// 3. Core Engine: Runs the Dynamic Programming loop calculation
+function runFloydWarshall() {
+    // Read user modified data metrics from table
+    for(let i=0; i<V; i++) {
+        for(let j=0; j<V; j++) {
+            if(i !== j) {
+                let val = parseInt(document.getElementById(`cell-${i}-${j}`).value);
+                graph[i][j] = isNaN(val) ? INF : val;
+            }
+        }
+    }
+
+    // Update canvas topology mapping
+    drawGraph();
+
+    // Setup working distances copy arrays
+    let dist = [];
+    for(let i=0; i<V; i++) {
+        dist.push([...graph[i]]);
+    }
+
+    let operationCount = 0;
+
+    // The iconic 3-Nested Dynamic Programming Loops 
+    for (let k = 0; k < V; k++) {
+        for (let i = 0; i < V; i++) {
+            for (let j = 0; j < V; j++) {
+                operationCount++;
+                if (dist[i][k] !== INF && dist[k][j] !== INF) {
+                    if (dist[i][k] + dist[k][j] < dist[i][j]) {
+                        dist[i][j] = dist[i][k] + dist[k][j];
+                    }
+                }
+            }
+        }
+    }
+
+    // Render result tables out to document dashboard view ports
+    renderOutputTable(dist);
+
+    // Display calculation properties metrics summary
+    const statsBox = document.getElementById("complexity-output");
+    statsBox.style.display = "block";
+   
+}
+
+// 4. Render calculations layout matrices grids out down onto UI outputs elements
+function renderOutputTable(distMatrix) {
+    const table = document.getElementById("output-table");
+    let html = `<tr><th>Source \\ Dest</th>`;
+    cities.forEach(c => html += `<th>${c}</th>`);
+    html += `</tr>`;
+
+    for(let i=0; i<V; i++) {
+        html += `<tr><th><strong>${cities[i]}</strong></th>`;
+        for(let j=0; j<V; j++) {
+            let displayVal = distMatrix[i][j] === INF ? "🚫 Unreachable" : "₹ " + distMatrix[i][j];
+            let cellStyle = graph[i][j] !== distMatrix[i][j] && i!==j ? 'style="background-color: #dcfce7; font-weight: bold; color: #166534;"' : '';
+            html += `<td ${cellStyle}>${displayVal}</td>`;
+        }
+        html += `</tr>`;
+    }
+    table.innerHTML = html;
+}
+
+// Kickstart scripts when view is ready
+window.onload = () => {
+    initInputTable();
+    drawGraph();
+};
+</script>
+</body>
+</html> 
